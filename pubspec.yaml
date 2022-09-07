@@ -38,6 +38,7 @@ dependencies:
   ########
   # Core #
   ########
+  mobile_scanner: ^2.0.0
 
   ############
   # Firebase #
