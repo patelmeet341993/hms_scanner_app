@@ -1,6 +1,11 @@
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
+import 'package:scanner_app/configs/app_theme.dart';
+import 'package:scanner_app/configs/constants.dart';
+import 'package:scanner_app/controllers/firestore_controller.dart';
 import 'package:scanner_app/utils/logger_service.dart';
 import 'package:scanner_app/utils/my_toast.dart';
 import 'package:scanner_app/views/homescreen/scanner_screen.dart';
@@ -18,18 +23,47 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late ThemeData themeData;
+
+  Future<void> scanORCode() async {
+    dynamic value = await Navigator.push(context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
+    Log().i("Scanner Response:$value");
+
+    if(value is String && value.isNotEmpty) {
+      MyToast.showSuccess("Scan Successful", context);
+
+      updateScannerData(value);
+    }
+  }
+
+  Future<void> updateScannerData(String data) async {
+    try {
+      dynamic decodedValue = jsonDecode(data);
+
+      if(decodedValue is Map) {
+        AdminUserProvider adminUserProvider = Provider.of<AdminUserProvider>(context, listen: false);
+        AdminUserModel? adminUserModel = adminUserProvider.getAdminUserModel();
+        if(adminUserModel != null) {
+          FirestoreController().firestore.collection(FirebaseNodes.adminUsersCollection).doc(adminUserModel.id).set({"scannerData" : decodedValue}, SetOptions(merge: true,));
+        }
+      }
+    }
+    catch(e, s) {}
+  }
+
   @override
   Widget build(BuildContext context) {
+    themeData = Theme.of(context);
     return Container(
       child: Scaffold(
         appBar: AppBar(
-          title: Text("Home Screen"),
+          title: const Text("Home Screen"),
           actions: [
             IconButton(
               onPressed: () {
                 AuthenticationController().logout(context: context);
               },
-              icon: Icon(Icons.logout),
+              icon: const Icon(Icons.logout),
             )
           ],
         ),
@@ -39,40 +73,72 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget getBody() {
-    return Center(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      width: double.maxFinite,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text("Home Body"),
-          SizedBox(height: 20,),
-          Consumer<AdminUserProvider>(
-            builder: (BuildContext context, AdminUserProvider adminUserProvider, Widget? child) {
-              AdminUserModel? adminUserModel = adminUserProvider.getAdminUserModel();
-              if(adminUserModel == null) {
-                return Text("Not Logged in");
-              }
-              return Column(
-                children: [
-                  Text("User Name:${adminUserProvider.getAdminUserModel()!.name}"),
-                  Text("User Role:${adminUserProvider.getAdminUserModel()!.role}"),
-                ],
-              );
-            },
-          ),
-          SizedBox(height: 20,),
-          FlatButton(
-            onPressed: () async {
-              // VisitController().createDummyVisitDataInFirestore();
-              // PatientController().createDummyPatientDataInFirestore();
+          Expanded(
+            child: Column(
+              children: [
+                Consumer<AdminUserProvider>(
+                  builder: (BuildContext context, AdminUserProvider adminUserProvider, Widget? child) {
+                    AdminUserModel? adminUserModel = adminUserProvider.getAdminUserModel();
+                    if(adminUserModel == null) {
+                      return const Text("Not Logged in");
+                    }
 
-              dynamic value = await Navigator.push(context, MaterialPageRoute(builder: (_) => ScannerScreen()));
-              Log().i("Scanner Response:$value");
-
-              MyToast.showSuccess("Got '$value' from Scanner", context);
-            },
-            child: Text("Create Visit"),
+                    return getLoggdInUserCard(adminUserModel);
+                  },
+                ),
+                const SizedBox(height: 20,),
+              ],
+            ),
           ),
+          GestureDetector(
+            onTap: () async {
+              scanORCode();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: themeData.colorScheme.primary,
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                "Scan QR",
+                style: AppTheme.getTextStyle(
+                  themeData.textTheme.caption!,
+                  color: themeData.colorScheme.onPrimary,
+                ),
+              ),
+            ),
+          ),
+           const Expanded(
+            child: SizedBox(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget getLoggdInUserCard(AdminUserModel? adminUserModel) {
+    if(adminUserModel == null) {
+      return const SizedBox();
+    }
+
+    return Container(
+      width: double.maxFinite,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+      decoration: BoxDecoration(
+        color: themeData.colorScheme.primary.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Text(adminUserModel.name),
         ],
       ),
     );
