@@ -1,17 +1,12 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:hms_models/hms_models.dart';
 import 'package:provider/provider.dart';
 import 'package:scanner_app/configs/app_theme.dart';
-import 'package:scanner_app/configs/constants.dart';
-import 'package:scanner_app/controllers/firestore_controller.dart';
-import 'package:scanner_app/utils/logger_service.dart';
-import 'package:scanner_app/utils/my_toast.dart';
 import 'package:scanner_app/views/homescreen/scanner_screen.dart';
 
 import '../../controllers/authentication_controller.dart';
-import '../../models/admin_user_model.dart';
 import '../../providers/admin_user_provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -27,10 +22,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> scanORCode() async {
     dynamic value = await Navigator.push(context, MaterialPageRoute(builder: (_) => const ScannerScreen()));
-    Log().i("Scanner Response:$value");
+    MyPrint.printOnConsole("Scanner Response:$value");
 
     if(value is String && value.isNotEmpty) {
-      MyToast.showSuccess("Scan Successful", context);
+      MyToast.showSuccess(context: context, msg: "Scan Successful",);
 
       updateScannerData(value);
     }
@@ -44,31 +39,32 @@ class _HomeScreenState extends State<HomeScreen> {
         AdminUserProvider adminUserProvider = Provider.of<AdminUserProvider>(context, listen: false);
         AdminUserModel? adminUserModel = adminUserProvider.getAdminUserModel();
         if(adminUserModel != null) {
-          FirestoreController().firestore.collection(FirebaseNodes.adminUsersCollection).doc(adminUserModel.id).set({"scannerData" : decodedValue}, SetOptions(merge: true,));
+          FirebaseNodes.adminUserDocumentReference(userId: adminUserModel.id).set({"scannerData" : decodedValue}, SetOptions(merge: true,));
         }
       }
     }
-    catch(e, s) {}
+    catch(e, s) {
+      MyPrint.printOnConsole("Error in HomeScreen.updateScannerData():$e");
+      MyPrint.printOnConsole(s);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     themeData = Theme.of(context);
-    return Container(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text("Home Screen"),
-          actions: [
-            IconButton(
-              onPressed: () {
-                AuthenticationController().logout(context: context);
-              },
-              icon: const Icon(Icons.logout),
-            )
-          ],
-        ),
-        body: getBody(),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Home Screen"),
+        actions: [
+          IconButton(
+            onPressed: () {
+              AuthenticationController().logout(context: context);
+            },
+            icon: const Icon(Icons.logout),
+          )
+        ],
       ),
+      body: getBody(),
     );
   }
 
